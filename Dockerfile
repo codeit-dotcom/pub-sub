@@ -1,14 +1,18 @@
-# Use official JDK image
-FROM eclipse-temurin:17-jdk-alpine
-
-# Set working directory
+# Build stage
+FROM maven:3.9.5-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copy project files
-COPY . .
+# Copy pom.xml and download dependencies (caches layers)
+COPY pom.xml .
+RUN mvn dependency:go-offline
 
-# Build project (skip tests for speed)
-RUN ./mvnw clean package -DskipTests
+# Copy source and build
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-# Run the JAR
-CMD ["java", "-jar", "target/*.jar"]
+# Run stage
+FROM eclipse-temurin:17-jdk-alpine
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
