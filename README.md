@@ -1,14 +1,48 @@
-# In-Memory Pub/Sub System (Java + Spring Boot + WebSockets)
+# Pub/Sub WebSocket Broker
 
-This is a simplified Pub/Sub system implemented in Java using Spring Boot.  
-It provides:
+This project implements a lightweight **publish/subscribe (pub/sub) broker** over WebSockets in Java.  
+It allows clients to:
 
-- WebSocket endpoint (`/ws`) for publishing, subscribing, unsubscribing, and ping.
-- REST APIs for topic management (create, delete, list), health checks, and stats.
-- Multi-publisher and multi-subscriber support.
-- In-memory state only (no database or external broker).
+- **Publish** messages to topics
+- **Subscribe** to topics
+- **Receive** messages asynchronously with backpressure handling
+- **Inspect broker statistics** via a REST endpoint (`GET /stats`)
 
 ---
+
+## Design Overview
+
+### Topics and Subscriptions
+- A **topic** represents a logical channel for messages (e.g., `orders`, `payments`).
+- Each topic maintains:
+    - A list of **messages** published
+    - A set of **subscribers** (WebSocket sessions) listening for updates
+- Topics are stored in:
+  ```java
+  private final ConcurrentHashMap<String, Topic> topics = new ConcurrentHashMap<>();
+   ```
+
+### Backpressure Policy
+
+To avoid overwhelming slow subscribers, each subscriber is assigned a bounded queue:
+
+- Each subscriber has a queue of at most 10 pending messages.
+- If the queue is full:
+    - New messages for that subscriber are dropped (to protect broker stability).
+    - This ensures that one slow consumer does not block others, keeping the system responsive and stable.
+
+
+```java
+private static final int SUBSCRIBER_QUEUE_SIZE = 10; // Backpressure limit
+private final BlockingQueue<String> queue; // bounded for backpressure
+```
+
+### Running State
+
+Broker maintains a running flag to gracefully shut down:
+```java
+private volatile boolean running = true;
+```
 
 ## 🚀 Setup & Run
 

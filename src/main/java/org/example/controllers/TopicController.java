@@ -1,10 +1,13 @@
 package org.example.controllers;
 
+import org.example.model.PublishTopicRequest;
+import org.example.model.TopicResponse;
 import org.example.service.PubSubService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -15,9 +18,9 @@ public class TopicController {
     @Autowired
     private PubSubService pubSubService;
 
-    @PostMapping("/{topic}")
-    public ResponseEntity<String> createTopic(@PathVariable String topic) {
-        if (pubSubService.createTopic(topic)) {
+    @PostMapping()
+    public ResponseEntity<String> createTopic(@RequestBody PublishTopicRequest topicRequest) {
+        if (pubSubService.createTopic(topicRequest.getName())) {
             return ResponseEntity.ok("Topic created");
         }
         return ResponseEntity.status(409).body("Topic already exists");
@@ -32,13 +35,18 @@ public class TopicController {
     }
 
     @GetMapping
-    public Set<String> listTopics() {
+    public List<TopicResponse> listTopics() {
         return pubSubService.listTopics();
     }
 
     @GetMapping("/health")
-    public Map<String, String> health() {
-        return Map.of("status", "UP");
+    public Map<String, Object> health() {
+        return pubSubService.getHealthStats();
+    }
+
+    @GetMapping("/stats")
+    public Map<String, Map<String, Object>> stats() {
+        return pubSubService.getStats();
     }
 
 }

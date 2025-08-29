@@ -9,6 +9,8 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.time.Instant;
+
 
 @Component
 @Slf4j
@@ -25,23 +27,54 @@ public class MyWebSocketHandler extends TextWebSocketHandler {
         log.info("Received WS message from {}: {}", session.getId(), message.getPayload());
 
         JsonObject obj = JsonParser.parseString(message.getPayload()).getAsJsonObject();
-        String action = obj.get("action").getAsString();
-        String topic = obj.get("topic").getAsString();
+        String action = obj.get("type").getAsString();
+        String requestId = obj.has("request_id") ? obj.get("request_id").getAsString() : null;
 
         switch (action) {
             case "subscribe":
+                String topic = obj.get("topic").getAsString();
                 pubSubService.subscribe(topic, session);
+                sendAck(session, requestId, topic, true);
                 break;
             case "unsubscribe":
+                topic = obj.get("topic").getAsString();
                 pubSubService.unsubscribe(topic, session);
+                sendAck(session, requestId, topic, true);
                 break;
             case "publish":
-                String msg = obj.get("message").getAsString();
-                pubSubService.publish(topic, msg);
+                topic = obj.get("topic").getAsString();
+                JsonObject messageObj = obj.getAsJsonObject("message");
+                pubSubService.publish(topic, messageObj.toString());
+                sendAck(session, requestId, topic, true);
                 break;
             case "ping":
-                session.sendMessage(new TextMessage("{\"action\":\"pong\"}"));
+                try {
+                    JsonObject pong = new JsonObject();
+                    pong.addProperty("type", "pong");
+                    pong.addProperty("request_id", "ping-abc");
+                    pong.addProperty("ts", Instant.now().toString()); // current timestamp
+
+                    session.sendMessage(new TextMessage(pong.toString()));
+                } catch (Exception e) {
+                    log.error("Failed to send pong", e);
+                }
                 break;
         }
     }
+
+    private void sendAck(WebSocketSession session, String requestId, String topic, boolean success) {
+        try {
+            JsonObject ack = new JsonObject();
+            ack.addProperty("type", "ack");
+            ack.addProperty("request_id", requestId != null ? requestId : "");
+            ack.addProperty("topic", topic != null ? topic : "");
+            ack.addProperty("status", success ? "ok" : "error");
+            ack.addProperty("ts", Instant.now().toString()); // current timestamp in ISO-8601
+
+            session.sendMessage(new TextMessage(ack.toString()));
+        } catch (Exception e) {
+            log.error("Failed to send ack", e);
+        }
+    }
+
 }
