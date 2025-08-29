@@ -1,0 +1,14 @@
+logging:
+  level:
+    root: INFO
+    org.springframework.web: INFO
+    com.example.pubsub: DEBUG
+
+server:
+  tomcat:
+    accesslog:
+      enabled: true
+      pattern: '%h %l %u %t "%r" %s %b'
+      directory: logs
+      prefix: access_log
+      suffix: .log
